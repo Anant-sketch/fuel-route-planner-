@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Fuel Route Planner — Anant Sharma</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #1557b0;
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --border-color: #e2e8f0;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--text-main); }
+  #map { position: absolute; inset: 0; z-index: 1; }
+
+  /* Floating UI Overlay */
+  .control-panel {
+    position: absolute;
+    z-index: 1000;
+    top: 16px;
+    left: 16px;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border-radius: 14px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+  }
+
+  .panel-header {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #fff;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .panel-header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-header .author-tag {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .author-tag .badge {
+    background: #2563eb;
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  .panel-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 5px;
+  }
+  .form-control {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .preset-btn {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    padding: 4px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #475569;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .adv-toggle {
+    font-size: 12px;
+    color: var(--primary);
+    cursor: pointer;
+    font-weight: 500;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  .adv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .btn-submit {
+    width: 100%;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-submit:hover {
+    background: var(--primary-dark);
+  }
+  .btn-submit:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  /* Results Card */
+  .results-section {
+    margin-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+  }
+  .metric-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .metric-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  .metric-card .val {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .metric-card .lbl {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .stops-list {
+    margin-top: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .stop-item {
+    padding: 9px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .stop-item:last-child { border-bottom: none; }
+  .stop-item:nth-child(even) { background: #fafafa; }
+  .stop-info .name { font-weight: 600; color: #1e293b; }
+  .stop-info .detail { font-size: 11px; color: var(--text-muted); }
+  .stop-price { text-align: right; font-weight: 600; color: var(--warning); }
+  .stop-price .gallons { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 8px 4px 0 4px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.start { background: #16a34a; }
+  .dot.finish { background: #dc2626; }
+  .dot.fuel { background: #f59e0b; }
+
+  .status-msg {
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .status-msg.error {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fee2e2;
+  }
+  .status-msg.loading {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #dbeafe;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="control-panel">
+  <div class="panel-header">
+    <h1>⛽ Fuel Route Planner</h1>
+    <div class="author-tag">
+      <span>By <strong style="color: #fff;">Anant Sharma</strong></span>
+      <span class="badge">Django 6.1 + OSRM</span>
+    </div>
+  </div>
+
+  <div class="panel-body">
+    <form id="route-form">
+      <div class="form-group">
+        <label for="start-input">Start Location (US)</label>
+        <input type="text" id="start-input" class="form-control" value="{{ default_start }}" placeholder="e.g. Los Angeles, CA" required>
+      </div>
+
+      <div class="form-group">
+        <label for="finish-input">Destination (US)</label>
+        <input type="text" id="finish-input" class="form-control" value="{{ default_finish }}" placeholder="e.g. New York, NY" required>
+      </div>
+
+      <div class="presets">
+        <button type="button" class="preset-btn" onclick="applyPreset('Los Angeles, CA', 'New York, NY')">LA → NYC</button>
+        <button type="button" class="preset-btn" onclick="applyPreset('Miami, FL', 'Seattle, WA')">Miami → Seattle</button>
+        <button type="button" class="preset-btn" onclick="applyPreset('Chicago, IL', 'Dallas, TX')">Chicago → Dallas</button>
+        <button type="button" class="preset-btn" onclick="applyPreset('San Francisco, CA', 'Boston, MA')">SF → Boston</button>
+      </div>
+
+      <span class="adv-toggle" onclick="toggleAdv()">⚙ Advanced parameters</span>
+      <div class="adv-grid" id="adv-box" style="display: none;">
+        <div>
+          <label style="font-size:11px; color:#64748b; font-weight:600;">RANGE (MILES)</label>
+          <input type="number" id="range-input" class="form-control" value="{{ default_range }}" min="50" max="2000">
+        </div>
+        <div>
+          <label style="font-size:11px; color:#64748b; font-weight:600;">MPG</label>
+          <input type="number" id="mpg-input" class="form-control" value="{{ default_mpg }}" min="1" max="100">
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn-submit">
+        <span>Find Optimal Route &amp; Fuel Stops</span>
+      </button>
+    </form>
+
+    <div id="status-container"></div>
+    <div id="results-container" style="display: none;"></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="dot start"></span> Start</div>
+      <div class="legend-item"><span class="dot fuel"></span> Fuel Stop</div>
+      <div class="legend-item"><span class="dot finish"></span> Finish</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([39.5, -98.35], 4);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap contributors | Designed by Anant Sharma'
+}).addTo(map);
+
+let currentLayer = null;
+
+const money = n => '$' + Number(n).toFixed(2);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toggleAdv() {
+  const box = document.getElementById('adv-box');
+  box.style.display = box.style.display === 'none' ? 'grid' : 'none';
+}
+
+function applyPreset(start, finish) {
+  document.getElementById('start-input').value = start;
+  document.getElementById('finish-input').value = finish;
+  planRoute();
+}
+
+function planRoute() {
+  const start = document.getElementById('start-input').value.trim();
+  const finish = document.getElementById('finish-input').value.trim();
+  const range = document.getElementById('range-input').value.trim() || '500';
+  const mpg = document.getElementById('mpg-input').value.trim() || '10';
+
+  if (!start || !finish) return;
+
+  const statusContainer = document.getElementById('status-container');
+  const resultsContainer = document.getElementById('results-container');
+  const submitBtn = document.getElementById('submit-btn');
+
+  submitBtn.disabled = true;
+  statusContainer.innerHTML = '<div class="status-msg loading">Optimizing route and stations along corridor…</div>';
+  resultsContainer.style.display = 'none';
+
+  const qs = new URLSearchParams({ start, finish, range_miles: range, mpg }).toString();
+  const apiUrl = '/api/route/?' + qs;
+
+  // Update browser URL query without reload
+  const newPageUrl = window.location.pathname + '?' + qs;
+  window.history.replaceState({}, '', newPageUrl);
+
+  fetch(apiUrl)
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      submitBtn.disabled = false;
+      if (!ok) {
+        statusContainer.innerHTML = '<div class="status-msg error">' + esc(data.error || 'Failed to plan route.') + '</div>';
+        return;
+      }
+      statusContainer.innerHTML = '';
+      displayResults(data);
+    })
+    .catch(err => {
+      submitBtn.disabled = false;
+      statusContainer.innerHTML = '<div class="status-msg error">' + esc(err.message || 'Network error') + '</div>';
+    });
+}
+
+function displayResults(data) {
+  const resultsContainer = document.getElementById('results-container');
+  
+  // Render geojson layer on map
+  if (currentLayer) {
+    map.removeLayer(currentLayer);
+  }
+
+  currentLayer = L.geoJSON(data.map, {
+    style: () => ({ color: '#1a73e8', weight: 5, opacity: 0.85 }),
+    pointToLayer: (f, ll) => {
+      const k = f.properties.kind;
+      const color = k === 'start' ? '#16a34a' : k === 'finish' ? '#dc2626' : '#f59e0b';
+      const radius = k === 'fuel_stop' ? 9 : 7;
+      return L.circleMarker(ll, {
+        radius: radius,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 1
+      });
+    },
+    onEachFeature: (f, l) => {
+      const p = f.properties;
+      if (p.kind === 'fuel_stop') {
+        l.bindPopup('<b>Stop ' + p.stop + ': ' + esc(p.station) + '</b><br>' +
+          esc(p.city) + ', ' + esc(p.state) + '<br>' +
+          '<b>Route Mile:</b> ' + p.route_mile + '<br>' +
+          '<b>Price:</b> ' + money(p.price_per_gallon) + '/gal<br>' +
+          '<b>Purchased:</b> ' + p.gallons_purchased + ' gal<br>' +
+          '<b>Total: ' + money(p.cost) + '</b>');
+      } else if (p.kind !== 'route') {
+        l.bindPopup('<b>' + (p.kind === 'start' ? 'Origin: ' : 'Destination: ') + '</b>' + esc(p.label));
+      }
+    }
+  }).addTo(map);
+
+  map.fitBounds(currentLayer.getBounds().pad(0.12));
+
+  // Render cards and stops
+  const stopsHtml = data.fuel_stops && data.fuel_stops.length > 0 ?
+    data.fuel_stops.map(s => `
+      <div class="stop-item">
+        <div class="stop-info">
+          <div class="name">#${s.stop}. ${esc(s.station)}</div>
+          <div class="detail">${esc(s.city)}, ${esc(s.state)} &bull; Mile ${s.route_mile}</div>
+        </div>
+        <div class="stop-price">
+          ${money(s.cost)}
+          <div class="gallons">${s.gallons_purchased} gal @ ${money(s.price_per_gallon)}</div>
+        </div>
+      </div>
+    `).join('') :
+    '<div class="stop-item"><div class="stop-info"><div class="name">Direct reach — No fuel stop needed within range!</div></div></div>';
+
+  resultsContainer.innerHTML = `
+    <div class="results-section">
+      <div class="metric-cards">
+        <div class="metric-card">
+          <div class="val">${money(data.total_fuel_cost)}</div>
+          <div class="lbl">Total Fuel Cost</div>
+        </div>
+        <div class="metric-card">
+          <div class="val">${data.distance_miles} mi</div>
+          <div class="lbl">Distance (~${data.duration_hours}h)</div>
+        </div>
+        <div class="metric-card">
+          <div class="val">${data.total_gallons_purchased} gal</div>
+          <div class="lbl">Gallons Purchased</div>
+        </div>
+        <div class="metric-card">
+          <div class="val">${data.fuel_stops.length}</div>
+          <div class="lbl">Optimal Fuel Stops</div>
+        </div>
+      </div>
+
+      <div style="font-size: 12px; font-weight:600; color:#64748b; margin-bottom: 6px; text-transform:uppercase;">Cost-Optimal Fuel Stops</div>
+      <div class="stops-list">${stopsHtml}</div>
+    </div>
+  `;
+  resultsContainer.style.display = 'block';
+}
+
+document.getElementById('route-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  planRoute();
+});
+
+// Auto-run on load
+window.addEventListener('DOMContentLoaded', () => {
+  planRoute();
+});
+</script>
+</body>
+</html>

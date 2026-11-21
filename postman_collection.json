@@ -1,0 +1,13 @@
+{
+  "info": {"name": "Fuel Route Planner", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [
+    {"name": "Plan route (POST)", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+      "url": "http://127.0.0.1:8000/api/route/",
+      "body": {"mode": "raw", "raw": "{\n  \"start\": \"Los Angeles, CA\",\n  \"finish\": \"New York, NY\"\n}"}}},
+    {"name": "Plan route (GET, lat/lng)", "request": {"method": "GET",
+      "url": {"raw": "http://127.0.0.1:8000/api/route/?start=34.05,-118.24&finish=Miami, FL&mpg=10", "host": ["http://127.0.0.1:8000"], "path": ["api", "route", ""],
+        "query": [{"key": "start", "value": "34.05,-118.24"}, {"key": "finish", "value": "Miami, FL"}, {"key": "mpg", "value": "10"}]}}},
+    {"name": "Interactive map (open in browser)", "request": {"method": "GET",
+      "url": "http://127.0.0.1:8000/api/route/map/?start=Seattle, WA&finish=Dallas, TX"}}
+  ]
+}
